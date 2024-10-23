@@ -1,5 +1,5 @@
-import {Baby} from 'lucide-react'
-import {defineField, defineType} from 'sanity'
+import { Baby } from 'lucide-react';
+import { defineField, defineType } from 'sanity';
 
 export const childType = defineType({
   name: 'child',
@@ -7,16 +7,18 @@ export const childType = defineType({
   title: 'Child',
   icon: Baby,
   fields: [
-    defineField({name: 'name', type: 'string'}),
-    defineField({name: 'age', type: 'number'}),
-    defineField({name: 'address', type: 'string', title: 'Home Address'}),
+    defineField({ name: 'name', type: 'string' }),
+    defineField({ name: 'age', type: 'number' }),
+    defineField({ name: 'address', type: 'string', title: 'Home Address' }),
     defineField({
       name: 'status',
       type: 'string',
-      options: {list: ['naughty', 'nice'], layout: 'radio', direction: 'horizontal'},
+      options: { list: ['naughty', 'nice'], layout: 'radio', direction: 'horizontal' },
       initialValue: 'nice',
     }),
-    defineField({name: 'wishList', type: 'array', of: [{type: 'string'}]}),
+    defineField({ name: 'wishList', type: 'array', of: [{ type: 'string' }] }),
+    defineField({ name: 'score', type: 'number', title: 'Naughtiness Score' }),
+    defineField({ name: 'twitterUsername', type: 'string' }),
   ],
   preview: {
     select: {
@@ -24,11 +26,11 @@ export const childType = defineType({
       age: 'age',
       status: 'status',
     },
-    prepare({name, age, status}) {
+    prepare({ name, age, status }) {
       return {
         title: name + ` (${age})`,
         subtitle: status ? status.charAt(0).toUpperCase() + status.slice(1) : undefined,
-      }
+      };
     },
   },
-})
+});

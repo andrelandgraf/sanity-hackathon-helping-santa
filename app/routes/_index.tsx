@@ -5,8 +5,8 @@ import { ExternalLinkIcon, Search, ThumbsDownIcon, ThumbsUpIcon, XIcon } from 'l
 import { Button, ButtonAnchor } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
-import { Form, MetaFunction, useLoaderData, useNavigation } from '@remix-run/react';
-import { LoaderFunctionArgs } from '@remix-run/node';
+import { Form, MetaFunction, useFetcher, useLoaderData, useNavigation, useRevalidator } from '@remix-run/react';
+import { ActionFunctionArgs, LoaderFunctionArgs } from '@remix-run/node';
 import { fetchTwitterProfile, fetchTweetsFromUser, PartialTweet } from '~/twitter/api.server';
 import { Progress } from '~/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
@@ -16,6 +16,8 @@ import { lru } from '~/cache/cache.server';
 import { useState } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import { DialogDescription } from '@radix-ui/react-dialog';
+import { fetchChildByTwitterUsername, updateChildStatusAndScore } from '~/sanity/children.server';
+import { cn } from '~/lib/utils';
 
 export const meta: MetaFunction = () => {
   return [{ title: 'Santa Dashboard' }];
@@ -35,7 +37,28 @@ type LoaderData = null | {
     naughtyTweet: PartialTweet;
   };
   tweets: PartialTweet[];
+  currentScore: number;
+  currentStatus: 'naughty' | 'nice' | 'unknown';
 };
+
+const actionSchema = zod.object({
+  twitterUsername: zod.string().min(1),
+  score: zod.string(),
+  status: zod.enum(['nice', 'naughty']),
+});
+
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const data = actionSchema.safeParse(Object.fromEntries(formData));
+  if (!data.success) {
+    console.error('Invalid form data:', data.error);
+    return new Response('Invalid form data', { status: 400 });
+  }
+  const score = Number(data.data.score);
+  console.log('Updating child status:', score);
+  await updateChildStatusAndScore(data.data.twitterUsername, data.data.status, score);
+  return {};
+}
 
 export async function loader({ request }: LoaderFunctionArgs): Promise<null | LoaderData | Response> {
   const url = new URL(request.url);
@@ -46,7 +69,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<null | Lo
   if (twitterUsername.startsWith('@')) {
     twitterUsername = twitterUsername.slice(1);
   }
-  return cachified({
+  const child = await fetchChildByTwitterUsername(twitterUsername);
+  const data = await cachified({
     cache: lru,
     key: twitterUsername,
     // One day cache
@@ -101,14 +125,22 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<null | Lo
       }
     },
   });
+  return {
+    ...data,
+    currentScore: child?.score || 0,
+    currentStatus: child?.status || 'unknown',
+  };
 }
 
 export default function SantaDashboard() {
   const data = useLoaderData<typeof loader>() as LoaderData;
   const navigation = useNavigation();
-  const loading = navigation.state === 'loading' || (navigation.state === 'submitting' && !!navigation.formData);
+  const loadingSearch =
+    (navigation.state === 'loading' || navigation.state === 'submitting') && navigation.formAction === 'GET';
+  const loadingRating = navigation.state === 'submitting' && navigation.formAction === 'POST';
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentTweetIndex, setCurrentTweetIndex] = useState(0);
+  const fetcher = useFetcher();
 
   const handleSwipe = (direction: 'left' | 'right') => {
     if (!data) return;
@@ -118,6 +150,9 @@ export default function SantaDashboard() {
       setIsDialogOpen(false);
       setCurrentTweetIndex(0);
     }
+    const newScore = direction === 'left' ? data.currentScore - 5 : data.currentScore + 5;
+    const newStatus = newScore < 50 ? 'naughty' : 'nice';
+    fetcher.submit({ twitterUsername: data.twitterUsername, score: newScore, status: newStatus }, { method: 'POST' });
   };
 
   const swipeHandlers = useSwipeable({
@@ -137,8 +172,8 @@ export default function SantaDashboard() {
         <CardContent>
           <Form className="flex space-x-2">
             <Input name="twitterUsername" type="text" placeholder="Enter Twitter username" className="flex-grow" />
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Checking...' : 'Check'}
+            <Button type="submit" disabled={loadingSearch}>
+              {loadingSearch ? 'Checking...' : 'Check'}
               <Search className="ml-2 h-4 w-4" />
             </Button>
           </Form>
@@ -156,6 +191,14 @@ export default function SantaDashboard() {
               <div>
                 <h2 className="text-2xl font-bold">{data.name}</h2>
                 <p className="text-muted-foreground">@{data.twitterUsername}</p>
+                <p
+                  className={cn({
+                    'text-red-500': data.currentStatus === 'naughty',
+                    'text-green-500': data.currentStatus === 'nice',
+                  })}
+                >
+                  {data.currentScore} ({data.currentStatus.charAt(0).toUpperCase() + data.currentStatus.slice(1)})
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -211,8 +254,18 @@ export default function SantaDashboard() {
               </CardHeader>
               <CardContent>
                 <Progress value={data.results.score} className="w-full" />
-                <p className="mt-2 text-center font-semibold">{data.results.score.toFixed(1)}% Nice</p>
+                <p className="mt-2 text-center font-semibold">
+                  {data.results.score.toFixed(1)}% Nice {!!data.currentScore && `(Current: ${data.currentScore})`}
+                </p>
               </CardContent>
+              <Form method="POST" className="p-4">
+                <Button type="submit" disabled={loadingRating || data.currentScore === data.results.score}>
+                  {loadingRating ? 'Submitting...' : 'Update Child Status'}
+                </Button>
+                <Input type="hidden" name="twitterUsername" value={data.twitterUsername} />
+                <Input type="hidden" name="score" value={data.results.score} />
+                <Input type="hidden" name="status" value={data.results.rating} />
+              </Form>
             </Card>
           </div>
 
