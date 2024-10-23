@@ -1,40 +1,55 @@
-# Welcome to Remix!
+# Web Dev Challenge - Sanity.io Edition
 
-- 📖 [Remix docs](https://remix.run/docs)
+> The holidays are upon us and Santa’s elves are behind schedule! Build an app to get the holiday back on track.
 
-## Development
+- [Web Dev Challenge - Sanity.io Edition](#web-dev-challenge---sanityio-edition)
+  - [Get started](#get-started)
+    - [Run development server](#run-development-server)
+    - [Seed data](#seed-data)
+    - [Change the content model](#change-the-content-model)
+  - [Learn more](#learn-more)
 
-Run the dev server:
+## Get started
 
-```shellscript
+Create your own Sanity Project and initialize a `.env` file with your own Project ID and Dataset name by running the following command.
+
+If you do not yet have a Sanity account, you'll be prompted to create one.
+
+```bash
+npx sanity@latest init --env
+```
+
+Note: Your Project ID and Dataset name are not considered secret, it's just convenient to retrieve them from the `.env` file.
+
+### Run development server
+
+Then, run the following command to start the Sanity Studio:
+
+```bash
 npm run dev
 ```
 
-## Deployment
+Now open your browser and navigate to [http://localhost:3333](http://localhost:3333) to access the Sanity Studio.
 
-First, build your app for production:
+### Seed data
 
-```sh
-npm run build
+To seed the project with some initial data, run the following command:
+
+```bash
+npx sanity@latest dataset import seed.tar.gz
 ```
 
-Then run the app in production mode:
+Or modify the original seed data creation script and re-run with. **Warning:** this will also delete all existing data in the dataset.
 
-```sh
-npm start
+```bash
+npx sanity@latest exec seed.ts --with-user-token
 ```
 
-Now you'll need to pick a host to deploy it to.
+### Change the content model
 
-### DIY
+The document type definitions and their fields can all be found in `src/schemaTypes`. You can safely modify these or add new ones, make sure to add them to the `src/schemaTypes/index.ts` array.
 
-If you're familiar with deploying Node applications, the built-in Remix app server is production-ready.
+## Learn more
 
-Make sure to deploy the output of `npm run build`
-
-- `build/server`
-- `build/client`
-
-## Styling
-
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever css framework you prefer. See the [Vite docs on css](https://vitejs.dev/guide/features.html#css) for more information.
+- [Sanity documentation](https://www.sanity.io/docs)
+- [Sanity Learn](https://www.sanity.io/learn)
